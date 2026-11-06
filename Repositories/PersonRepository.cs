@@ -1,45 +1,44 @@
-﻿using mmaldonadoS5.Models;
+using mmaldonadoS5.Models;
 using SQLite;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace mmaldonadoS5.Repositories
 {
     public class PersonRepository
     {
-        string _dbpath;// ruta
-        private SQLiteConnection _conn;
-        public string Message { get; set; } 
-        public void Init()
+        private readonly string _dbPath;
+        private SQLiteConnection? _conn;
+        public string? Message { get; private set; }
+
+        public PersonRepository(string path)
+        {
+            _dbPath = path;
+        }
+
+        private void Init()
         {
             if (_conn is not null)
                 return;
-            _conn = new(_dbpath);
+
+            _conn = new SQLiteConnection(_dbPath);
             _conn.CreateTable<Persona>();
         }
 
-        public PersonRepository (string path)
+        public bool AddNewPerson(string? name)
         {
-            _dbpath = path;
-        }
-
-        public void AddNewPerson(string name)
-        {
-            int result = 0;
             try
             {
                 Init();
-                if (string.IsNullOrEmpty(name))
-                    throw new Exception("El nombre es requerido");
-                Persona person = new() { Name = name };
-                result = _conn.Insert(person);
-                Message = string.Format("Dato ingresado", result, name);
+                if (string.IsNullOrWhiteSpace(name))
+                    throw new Exception("El nombre es requerido.");
+
+                _conn!.Insert(new Persona { Name = name.Trim() });
+                Message = "Persona agregada correctamente.";
+                return true;
             }
             catch (Exception ex)
             {
-
-                Message = string.Format("Error" + ex.Message);
+                Message = "Error al agregar: " + ex.Message;
+                return false;
             }
         }
 
@@ -48,14 +47,63 @@ namespace mmaldonadoS5.Repositories
             try
             {
                 Init();
-                return _conn.Table<Persona>().ToList();
+                Message = null;
+                return _conn!.Table<Persona>().OrderBy(p => p.Name).ToList();
             }
             catch (Exception ex)
             {
-
-                Message = string.Format("Error" + ex.Message);
+                Message = "Error al consultar: " + ex.Message;
+                return new List<Persona>();
             }
-            return new List<Persona>();
+        }
+
+        public bool UpdatePerson(int id, string? name)
+        {
+            try
+            {
+                Init();
+                if (id <= 0)
+                    throw new Exception("El ID debe ser válido.");
+                if (string.IsNullOrWhiteSpace(name))
+                    throw new Exception("El nombre es requerido.");
+
+                var person = _conn!.Find<Persona>(id);
+                if (person is null)
+                    throw new Exception("No se encontró una persona con ese ID.");
+
+                person.Name = name.Trim();
+                if (_conn.Update(person) == 0)
+                    throw new Exception("No se pudo actualizar la persona.");
+
+                Message = "Persona actualizada correctamente.";
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Message = "Error al actualizar: " + ex.Message;
+                return false;
+            }
+        }
+
+        public bool DeletePerson(int id)
+        {
+            try
+            {
+                Init();
+                if (id <= 0)
+                    throw new Exception("El ID debe ser válido.");
+
+                if (_conn!.Delete<Persona>(id) == 0)
+                    throw new Exception("No se encontró una persona con ese ID.");
+
+                Message = "Persona eliminada correctamente.";
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Message = "Error al eliminar: " + ex.Message;
+                return false;
+            }
         }
     }
 }
